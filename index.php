@@ -1,7 +1,6 @@
 <?php
 mb_internal_encoding('UTF-8');
 mb_http_output('UTF-8');
-mb_regex_encoding('UTF-8');
 
 $servername = 'localhost';
 $username = 'root';
@@ -27,22 +26,22 @@ if (isset($_GET['url']) && !empty($_GET['url'])) {
     $url = $_GET['url'];
     $id = GetShortUrl($conn, $url);
     $ins = '<br/>Here is the short <a href="' . $base_url . $id . '" target="_blank">' . 'link</a>: <br>
-    <input type="text" value="' . $base_url . $id . '" id="myInput">
-    <button onclick="copyUrl()">Copy URL</button>';
+    <input type="text" value="' . $base_url . $id . '" id="cptx">
+    <button onclick="copyUrl(this)">Copy URL</button>';
 }
 
 echo '<!DOCTYPE html>
 <html>
 <head>
-   <title>ShortURL</title>
+    <title>ShortURL</title>
 </head>
 <body>
     <script>
-    function copyUrl() {
-        let copyText = document.getElementById("myInput");
+    function copyUrl(m) {
+        let copyText = document.getElementById("cptx");
         copyText.select();
         document.execCommand("copy");
-        document.getElementById("myTooltip").innerHTML = "Copied: " + copyText.value;
+        m.textContent = "Copied!";
     }
     </script>
     <center>
@@ -80,7 +79,7 @@ function GetRedirectUrl($conn, $id) {
         if ($quer->rowCount() > 0) {
             return $quer->fetch(PDO::FETCH_ASSOC)['url'];
         } else {
-            die("Invalid ShortURL ID!");
+            die("Invalid ID!");
         }
     } catch(PDOException $e) {
         die("Failed to get link: <hr/>" . $e->getMessage() . "<br/>");
