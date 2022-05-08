@@ -1,98 +1,88 @@
 <?php
 mb_internal_encoding('UTF-8');
 mb_http_output('UTF-8');
-mb_http_input('UTF-8');
 mb_regex_encoding('UTF-8');
 
 $servername = 'localhost';
 $username = 'root';
 $password = ''; // on localhost by default there is no password
 $dbname = 'def';
-$base_url = 'https://example.com/shorturl'; // it is your application url
+$base_url = 'https://example.com/shorturl/'; // it is your application url
 
-$head = '<!DOCTYPE html>
+try {
+    $conn = new PDO('mysql:host=' . $servername . ';dbname=' . $dbname . ';charset=UTF8', $username, $password);
+} catch(PDOException $e) {
+    die("Cant connect to DB!");
+}
+
+if (isset($_GET['r']) && !empty($_GET['r'])) {
+    $id = $_GET['r'];
+    $url = GetRedirectUrl($conn, $id);
+    header("location:" . $url);
+    exit;
+}
+
+$ins = '';
+if (isset($_GET['url']) && !empty($_GET['url'])) {
+    $url = $_GET['url'];
+    $id = GetShortUrl($conn, $url);
+    $ins = '<br/>Here is the short <a href="' . $base_url . $id . '" target="_blank">' . 'link</a>: <br>
+    <input type="text" value="' . $base_url . $id . '" id="myInput">
+    <button onclick="copyUrl()">Copy URL</button>';
+}
+
+echo '<!DOCTYPE html>
 <html>
 <head>
    <title>ShortURL</title>
 </head>
 <body>
-<script>
-function myFunction() {
-  var copyText = document.getElementById("myInput");
-  copyText.select();
-  document.execCommand("copy");
-  var tooltip = document.getElementById("myTooltip");
-  tooltip.innerHTML = "Copied: " + copyText.value;
-}
-</script>';
-
-if (isset($_GET['r']) && $_GET['r'] != "") {
-    $slug = $_GET['r'];
-    try {
-        $conn = new PDO('mysql:host=' . $servername . ';dbname=' . $dbname . ';charset=UTF8', $username, $password);
+    <script>
+    function copyUrl() {
+        let copyText = document.getElementById("myInput");
+        copyText.select();
+        document.execCommand("copy");
+        document.getElementById("myTooltip").innerHTML = "Copied: " + copyText.value;
     }
-    catch(PDOException $e) {
-        die("DB connect error!");
-    }
-    $url = GetRedirectUrl($conn, $slug);
-    header("location:" . $url);
-    exit;
-}
-
-$form = '<h1>ShortURL</h1>
-<form>
-<input style="width: 500px; height: 22px;" type="url" name="url" required />
-<input class="button" type="submit" value="Get"/>
-</form>';
-if (isset($_GET['url']) && $_GET['url'] != "") {
-    $url = $_GET['url'];
-    try {
-        $conn = new PDO('mysql:host=' . $servername . ';dbname=' . $dbname . ';charset=UTF8', $username, $password);
-    }
-    catch(PDOException $e) {
-        die("DB connect error!");
-    }
-    $slug = GetShortUrl($conn, $url);
-    echo $head . '<center>' . $form . '<br/>Here is the short <a href="' . $base_url . '/' . $slug . '" target="_blank">' . 'link</a>: <br>';
-    echo '<input type="text" value="' . $base_url . '/' . $slug . '" id="myInput"><button onclick="myFunction()">Copy URL</button></center>';
-} else {
-    echo $head . '<center>' . $form . '</center>';
-}
+    </script>
+    <center>
+        <h1>ShortURL</h1>
+        <form>
+            <input style="width:80%" type="url" name="url" required />
+            <input class="button" type="submit" value="Get"/>
+        </form>
+    ' . $ins . '
+    </center>
+</body>
+</html>';
 
 function GetShortUrl($conn, $url) {
     try {
-        $quer = $conn->prepare("SELECT * FROM `links` WHERE `url` = ? LIMIT 1");
-        $quer->execute(array($url));
+        $quer = $conn->prepare("SELECT `id` FROM `links` WHERE `url` = ? LIMIT 1");
+        $quer->execute([$url]);
         if ($quer->rowCount() > 0) {
             $res = $quer->fetch(PDO::FETCH_ASSOC)['id'];
         } else {
             $quer = $conn->prepare("INSERT INTO `links` (`url`) VALUES (?)");
-            $quer->execute(array($url));
-            $stmt = $conn->query("SELECT LAST_INSERT_ID()");
-            $res = $stmt->fetchColumn();
+            $quer->execute([$url]);
+            $res = $conn->lastInsertId();
         }
-		return base_convert($res, 10, 36);
-    }
-    catch(PDOException $e) {
+        return base_convert($res, 10, 36);
+    } catch(PDOException $e) {
         die("Failed to create short link : <hr/>" . $e->getMessage() . "<br/>");
     }
 }
 
-function GetRedirectUrl($conn, $slug) {
+function GetRedirectUrl($conn, $id) {
     try {
-        $quer = $conn->prepare("SELECT * FROM `links` WHERE `id` = ? LIMIT 1");
-        $quer->execute(array(addslashes(base_convert($slug, 36, 10))));
+        $quer = $conn->prepare("SELECT `url` FROM `links` WHERE `id` = ? LIMIT 1");
+        $quer->execute(array(addslashes(base_convert($id, 36, 10))));
         if ($quer->rowCount() > 0) {
-            $res = $quer->fetch(PDO::FETCH_ASSOC);
-            return $res['url'];
-        }
-        else {
+            return $quer->fetch(PDO::FETCH_ASSOC)['url'];
+        } else {
             die("Invalid ShortURL ID!");
         }
-    }
-    catch(PDOException $e) {
+    } catch(PDOException $e) {
         die("Failed to get link: <hr/>" . $e->getMessage() . "<br/>");
     }
 }
-
-echo '</body></html>';
